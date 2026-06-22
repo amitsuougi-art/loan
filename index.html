@@ -1,0 +1,1483 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LENS — 融資審査AI支援システム | 横浜銀行 融資部</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  * { font-family: 'Noto Sans JP', 'Inter', sans-serif; box-sizing: border-box; }
+  body { background: #F0F4F8; margin: 0; }
+
+  :root {
+    --sidebar: #0D1B2A;
+    --primary: #1E6FD9;
+    --primary-light: #3B82F6;
+    --ai-cyan: #00D4FF;
+    --ai-glow: rgba(0,212,255,0.15);
+    --success: #10B981;
+    --warning: #F59E0B;
+    --danger: #EF4444;
+    --surface: #FFFFFF;
+    --text-primary: #0F172A;
+    --text-secondary: #64748B;
+    --border: #E2E8F0;
+  }
+
+  .sidebar {
+    width: 240px; min-height: 100vh;
+    background: var(--sidebar);
+    position: fixed; left: 0; top: 0; z-index: 100;
+    display: flex; flex-direction: column;
+  }
+  .main-content { margin-left: 240px; min-height: 100vh; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 20px; color: #94A3B8;
+    cursor: pointer; transition: all 0.2s;
+    border-left: 3px solid transparent;
+    font-size: 14px; font-weight: 500;
+  }
+  .nav-item:hover { color: #E2E8F0; background: rgba(255,255,255,0.06); }
+  .nav-item.active { color: #fff; border-left-color: var(--ai-cyan); background: rgba(0,212,255,0.1); }
+  .nav-icon { width: 18px; text-align: center; font-size: 16px; }
+
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  .stat-card {
+    background: var(--surface); border-radius: 16px;
+    padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.04);
+    position: relative; overflow: hidden;
+  }
+  .stat-card::before {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 80px; height: 80px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--ai-cyan) 100%);
+    opacity: 0.08; transform: translate(20px, -20px);
+  }
+
+  .info-card {
+    background: var(--surface); border-radius: 16px; padding: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+    border: 1px solid var(--border);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .info-card:hover { transform: translateY(-2px); box-shadow: 0 4px 24px rgba(0,0,0,0.1); }
+
+  .ai-card {
+    background: linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(30,111,217,0.08) 100%);
+    border: 1px solid rgba(0,212,255,0.25);
+    border-radius: 16px; padding: 24px;
+    box-shadow: 0 0 0 1px rgba(0,212,255,0.1), 0 4px 24px rgba(0,212,255,0.08);
+  }
+
+  .risk-card {
+    background: linear-gradient(135deg, rgba(239,68,68,0.06) 0%, rgba(251,146,60,0.06) 100%);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 16px; padding: 24px;
+  }
+
+  .source-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+    background: rgba(30,111,217,0.1); color: var(--primary);
+    border: 1px solid rgba(30,111,217,0.2);
+  }
+
+  .ai-badge {
+    background: rgba(0,212,255,0.12); color: #0099BB;
+    border: 1px solid rgba(0,212,255,0.3);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: white; border: none; border-radius: 10px;
+    padding: 10px 20px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(30,111,217,0.3);
+  }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(30,111,217,0.4); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-ai {
+    background: linear-gradient(135deg, #0099BB 0%, var(--ai-cyan) 100%);
+    color: white; border: none; border-radius: 10px;
+    padding: 12px 28px; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all 0.2s;
+    box-shadow: 0 4px 16px rgba(0,212,255,0.35);
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn-ai:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,212,255,0.5); }
+  .btn-ai:disabled { opacity: 0.7; cursor: default; transform: none; }
+
+  .btn-secondary {
+    background: white; color: var(--text-secondary);
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 20px; font-size: 14px; font-weight: 500;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn-secondary:hover { border-color: var(--primary); color: var(--primary); }
+
+  .priority-high { background: rgba(239,68,68,0.1); color: #DC2626; border: 1px solid rgba(239,68,68,0.2); padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .priority-mid { background: rgba(245,158,11,0.1); color: #D97706; border: 1px solid rgba(245,158,11,0.2); padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+  .priority-low { background: rgba(16,185,129,0.1); color: #059669; border: 1px solid rgba(16,185,129,0.2); padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+
+  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  .skeleton { background: linear-gradient(90deg, #E2E8F0 25%, #F1F5F9 50%, #E2E8F0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
+
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  .fade-in-up { animation: fadeInUp 0.4s ease forwards; }
+
+  @keyframes pulse-cyan { 0%, 100% { box-shadow: 0 0 0 0 rgba(0,212,255,0.4); } 50% { box-shadow: 0 0 0 8px rgba(0,212,255,0); } }
+  .pulse-ai { animation: pulse-cyan 2s infinite; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { animation: spin 0.8s linear infinite; display: inline-block; }
+
+  .progress-bar { height: 4px; background: var(--border); border-radius: 999px; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 999px; transition: width 0.1s; }
+
+  .score-bar { height: 8px; background: #E2E8F0; border-radius: 999px; overflow: hidden; }
+  .score-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--primary), var(--ai-cyan)); transition: width 0.8s cubic-bezier(0.34,1.56,0.64,1); }
+
+  .search-input {
+    width: 100%; padding: 14px 20px; font-size: 15px;
+    border: 2px solid var(--border); border-radius: 12px;
+    outline: none; transition: border-color 0.2s, box-shadow 0.2s; background: white;
+  }
+  .search-input:focus { border-color: var(--primary); box-shadow: 0 0 0 4px rgba(30,111,217,0.1); }
+
+  select.search-input, input.search-input { padding: 11px 14px; font-size: 14px; border-width: 1.5px; }
+
+  .tag {
+    display: inline-flex; align-items: center;
+    padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 600;
+    background: rgba(30,111,217,0.08); color: var(--primary);
+  }
+
+  .page-header { padding: 28px 32px 20px; border-bottom: 1px solid var(--border); background: white; }
+  .content-area { padding: 28px 32px; }
+
+  .kpi-number { font-size: 32px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
+  .kpi-label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+  .kpi-delta { font-size: 12px; font-weight: 600; margin-top: 4px; }
+  .kpi-delta.up { color: var(--success); }
+  .kpi-delta.down { color: var(--danger); }
+  .kpi-delta.neutral { color: var(--text-secondary); }
+
+  .logo-text { font-size: 17px; font-weight: 700; color: white; letter-spacing: -0.01em; }
+  .logo-sub { font-size: 10px; color: var(--ai-cyan); font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 1px; }
+
+  .glow-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ai-cyan); box-shadow: 0 0 8px var(--ai-cyan); display: inline-block; }
+
+  .section-title { font-size: 18px; font-weight: 700; color: var(--text-primary); }
+  .section-sub { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+  .risk-item { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(239,68,68,0.1); }
+  .risk-icon { font-size: 16px; flex-shrink: 0; }
+  .risk-text { font-size: 13px; color: var(--text-primary); }
+  .risk-sub { font-size: 12px; color: #DC2626; margin-top: 3px; }
+
+  .col-title {
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--text-secondary);
+    margin-bottom: 14px; padding-bottom: 10px; border-bottom: 2px solid var(--border);
+  }
+
+  .case-row {
+    background: white; border-radius: 12px; padding: 18px;
+    border: 1px solid var(--border); margin-bottom: 12px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .case-row:hover { border-color: var(--primary); box-shadow: 0 4px 16px rgba(30,111,217,0.12); transform: translateY(-1px); }
+
+  .ringi-section { border-bottom: 1px solid #F1F5F9; padding: 18px 0; }
+  .ringi-section:last-child { border-bottom: none; }
+  .ringi-label { font-size: 11px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .ringi-body { font-size: 13.5px; line-height: 1.85; color: var(--text-primary); }
+
+  .cite { color: #0099BB; font-size: 10px; font-weight: 700; background: rgba(0,212,255,0.12); border: 1px solid rgba(0,212,255,0.3); padding: 0 5px; border-radius: 6px; vertical-align: super; cursor: help; }
+  mark.uncertain { background: rgba(245,158,11,0.22); border-bottom: 2px dashed #D97706; padding: 0 2px; border-radius: 3px; }
+
+  .doc-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 10px; background: #F8FAFC; margin-bottom: 8px; font-size: 13px; }
+
+  .extract-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .extract-table th { text-align: left; padding: 10px 12px; background: #F8FAFC; color: var(--text-secondary); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); }
+  .extract-table td { padding: 11px 12px; border-bottom: 1px solid #F1F5F9; }
+  .conf-pill { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .conf-high { background: rgba(16,185,129,0.12); color: #059669; }
+  .conf-low { background: rgba(245,158,11,0.14); color: #D97706; }
+
+  .alert-row {
+    display: flex; gap: 16px; padding: 18px; border-radius: 12px;
+    background: white; border: 1px solid var(--border); margin-bottom: 12px;
+    border-left: 4px solid var(--border); transition: all 0.2s;
+  }
+  .alert-row:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+  .alert-row.sev-high { border-left-color: var(--danger); }
+  .alert-row.sev-mid { border-left-color: var(--warning); }
+  .alert-row.sev-low { border-left-color: var(--success); }
+
+  .nego-card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-bottom: 14px; }
+  .qa-q { font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+  .qa-a { font-size: 13px; color: var(--text-secondary); line-height: 1.7; padding-left: 14px; border-left: 3px solid rgba(0,212,255,0.4); }
+
+  #loading-overlay {
+    position: fixed; inset: 0; background: rgba(13,27,42,0.7);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 1000; backdrop-filter: blur(4px);
+    opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  }
+  #loading-overlay.visible { opacity: 1; pointer-events: all; }
+  .loading-ring { width: 60px; height: 60px; border: 3px solid rgba(0,212,255,0.3); border-top-color: var(--ai-cyan); border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+  .gauge-wrap { position: relative; width: 160px; height: 160px; margin: 0 auto; }
+  .gauge-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+  .toast { position: fixed; bottom: 28px; right: 28px; background: var(--sidebar); color: white; padding: 14px 20px; border-radius: 12px; font-size: 13px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); z-index: 2000; display: flex; align-items: center; gap: 10px; opacity: 0; transform: translateY(20px); transition: all 0.3s; border: 1px solid rgba(0,212,255,0.3); }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  /* Modal */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(13,27,42,0.55); backdrop-filter: blur(3px); z-index: 1500; display: none; align-items: flex-start; justify-content: center; padding: 40px 20px; overflow-y: auto; }
+  .modal-overlay.show { display: flex; }
+  .modal-box { background: white; border-radius: 16px; width: 100%; max-width: 760px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); animation: fadeInUp 0.3s ease; }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: white; border-radius: 16px 16px 0 0; }
+  .modal-close { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--border); background: white; cursor: pointer; font-size: 16px; color: var(--text-secondary); }
+  .modal-close:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* Word風 稟議書ドキュメント */
+  .doc-paper { background: white; padding: 48px 56px; font-size: 13px; line-height: 1.9; color: #1a1a1a; }
+  .doc-paper h1 { font-size: 19px; text-align: center; letter-spacing: 0.3em; margin: 0 0 6px; font-weight: 700; }
+  .doc-meta { display: flex; justify-content: space-between; font-size: 12px; color: #444; border-bottom: 2px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 20px; }
+  .doc-h { font-size: 14px; font-weight: 700; border-left: 5px solid var(--primary); padding-left: 10px; margin: 22px 0 10px; }
+  .doc-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin: 8px 0; }
+  .doc-table th, .doc-table td { border: 1px solid #cbd5e1; padding: 8px 10px; }
+  .doc-table th { background: #F1F5F9; text-align: left; width: 150px; font-weight: 600; }
+  .doc-stamp-row { display: flex; gap: 12px; justify-content: flex-end; margin-top: 28px; }
+  .doc-stamp { width: 70px; }
+  .doc-stamp .label { font-size: 10px; text-align: center; border: 1px solid #1a1a1a; border-bottom: none; padding: 3px; background: #F1F5F9; }
+  .doc-stamp .box { height: 56px; border: 1px solid #1a1a1a; display: flex; align-items: center; justify-content: center; color: #c00; font-size: 11px; }
+
+  .hist-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid #F1F5F9; }
+  .hist-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="loading-ring" style="margin-bottom:20px;"></div>
+  <div style="color:white;font-size:14px;font-weight:500;" id="loading-text">AI分析中...</div>
+  <div style="width:300px;margin-top:16px;" class="progress-bar">
+    <div class="progress-fill" id="progress-fill" style="width:0%;background:linear-gradient(90deg,#1E6FD9,#00D4FF);"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"><span class="glow-dot"></span><span id="toast-text"></span></div>
+
+<!-- ===== 稟議書プレビュー (F-08 出力) ===== -->
+<div class="modal-overlay" id="modal-ringi" onclick="if(event.target===this)closeModal('modal-ringi')">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div style="font-size:14px;font-weight:700;">📄 稟議書プレビュー（Word出力イメージ）</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn-primary" style="font-size:12px;padding:8px 14px;" onclick="toast('稟議書_神奈川精密工業.docx をダウンロードしました')">⬇ ダウンロード</button>
+        <button class="modal-close" onclick="closeModal('modal-ringi')">✕</button>
+      </div>
+    </div>
+    <div class="doc-paper">
+      <h1>稟　議　書</h1>
+      <div style="text-align:center;font-size:11px;color:#666;margin-bottom:18px;">— 設備資金融資 —</div>
+      <div class="doc-meta">
+        <span>案件ID：2026-設-0288</span>
+        <span>起案日：2026年6月16日</span>
+        <span>起案者：融資部 審査グループ 鈴木 健太</span>
+      </div>
+
+      <table class="doc-table">
+        <tr><th>取引先名</th><td>神奈川精密工業株式会社</td></tr>
+        <tr><th>所在地 / 業種</th><td>神奈川県厚木市 / 精密機器・電子部品製造</td></tr>
+        <tr><th>融資科目</th><td>設備資金（新生産ライン投資）</td></tr>
+        <tr><th>融資金額</th><td>金 800,000,000 円</td></tr>
+        <tr><th>資金使途</th><td>自動加工機3台導入（設備6.8億円・付帯工事1.2億円）</td></tr>
+        <tr><th>行内格付 / 債務者区分</th><td>格付 4（10段階）／ 正常先　＜前回 5 → 今回 4＞</td></tr>
+      </table>
+
+      <div class="doc-h">１．案件概要</div>
+      <div>主力の自動車向け精密部品の増産対応として、新生産ライン導入に係る設備資金8.0億円の申込を受けた。本投資により生産能力は約1.4倍に拡大する見込み。</div>
+
+      <div class="doc-h">２．融資背景・資金需要</div>
+      <div>大手部品メーカーA社からの年間約12億円規模の受注内示を背景に、現行設備の生産能力が逼迫。EVシフトに伴う軽量・高精度部品の需要拡大を取り込むための先行投資である。</div>
+
+      <div class="doc-h">３．審査ポイント</div>
+      <div>償却前営業利益（第38期約3.9億円）により年間返済額（約5,300万円）に対し十分な返済原資を確保。本社工場（評価額9.4億円）を担保とし、保証協会保証を併用。受注内示書により初年度稼働率の目処は立つが、内示の確度は原本確認を要す。</div>
+
+      <div class="doc-h">４．リスク要因</div>
+      <div>投資後2年間は借入依存度が前期比+8.4pt上昇し減価償却負担が先行。A社向け売上集中につき、取引分散方針の確認を要す。自動車部品市場のEVシフトに伴う需要構造変化に留意。</div>
+
+      <div class="doc-h">５．推奨条件</div>
+      <table class="doc-table">
+        <tr><th>返済期間</th><td>12年（元金据置6ヶ月）</td></tr>
+        <tr><th>適用金利</th><td>基準金利＋0.6%（金利スワップ提案可）</td></tr>
+        <tr><th>担保・保証</th><td>本社工場担保＋信用保証協会（30%）</td></tr>
+        <tr><th>財務制限条項</th><td>自己資本比率25%維持</td></tr>
+      </table>
+
+      <div class="doc-stamp-row">
+        <div class="doc-stamp"><div class="label">起案</div><div class="box">鈴木㊞</div></div>
+        <div class="doc-stamp"><div class="label">審査</div><div class="box"></div></div>
+        <div class="doc-stamp"><div class="label">次長</div><div class="box"></div></div>
+        <div class="doc-stamp"><div class="label">部長</div><div class="box"></div></div>
+      </div>
+      <div style="font-size:10px;color:#999;margin-top:20px;border-top:1px solid #ddd;padding-top:8px;">本書はAI起案支援システム「LENS」により生成されたドラフトです。参照元・要確認箇所はシステム上で確認のうえ、承認者による最終確認を要します。</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== アラート詳細 (S-08) ===== -->
+<div class="modal-overlay" id="modal-alert" onclick="if(event.target===this)closeModal('modal-alert')">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div style="font-size:14px;font-weight:700;">⚠ アラート詳細 <span class="priority-high" style="margin-left:8px;">重要</span></div>
+      <button class="modal-close" onclick="closeModal('modal-alert')">✕</button>
+    </div>
+    <div style="padding:24px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="font-size:17px;font-weight:700;">三浦電子工業株式会社</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">AL-2026-0612 ・ 外部要因リスク ・ 検知 2026/06/15 09:12</div>
+        </div>
+        <div style="text-align:right;"><div style="font-size:11px;color:var(--text-secondary);">リスクスコア</div><div style="font-size:28px;font-weight:700;color:#DC2626;">87<span style="font-size:13px;">/100</span></div></div>
+      </div>
+
+      <div class="risk-card" style="margin-bottom:18px;">
+        <div style="font-size:12px;font-weight:700;color:#DC2626;margin-bottom:8px;">検知理由</div>
+        <div style="font-size:13px;line-height:1.7;color:var(--text-primary);">主要販売先「○○工業」の<strong>民事再生手続き開始</strong>の報道を検知。当社売上の約38%を占める取引先のため、売掛金回収遅延および連鎖的な業況悪化のリスクが高まっている。</div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+        <div class="info-card" style="padding:14px;"><div style="font-size:11px;color:var(--text-secondary);">取引集中度</div><div style="font-size:20px;font-weight:700;color:#DC2626;">38%</div></div>
+        <div class="info-card" style="padding:14px;"><div style="font-size:11px;color:var(--text-secondary);">当該先 売掛金残高</div><div style="font-size:20px;font-weight:700;">¥2.4億</div></div>
+        <div class="info-card" style="padding:14px;"><div style="font-size:11px;color:var(--text-secondary);">当行与信残高</div><div style="font-size:20px;font-weight:700;">¥5.0億</div></div>
+        <div class="info-card" style="padding:14px;"><div style="font-size:11px;color:var(--text-secondary);">推奨対応期限</div><div style="font-size:20px;font-weight:700;color:#D97706;">即時</div></div>
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">根拠データソース</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+        <span class="source-badge">📰 ニュース配信基盤</span><span class="source-badge">勘定系：売掛金残高</span><span class="source-badge">EYS：取引先情報</span>
+      </div>
+
+      <div style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">対応履歴</div>
+      <div class="hist-item"><span class="hist-dot" style="background:#DC2626;"></span><div><div style="font-size:13px;font-weight:600;">アラート自動検知</div><div style="font-size:11px;color:var(--text-secondary);">2026/06/15 09:12 ・ システム（ニュース監視）</div></div></div>
+      <div class="hist-item"><span class="hist-dot" style="background:var(--primary);"></span><div><div style="font-size:13px;font-weight:600;">担当者へ通知・確認開始</div><div style="font-size:11px;color:var(--text-secondary);">2026/06/15 09:30 ・ 鈴木 健太</div></div></div>
+      <div class="hist-item" style="border:none;"><span class="hist-dot" style="background:var(--warning);"></span><div><div style="font-size:13px;font-weight:600;">面談アポイント調整中</div><div style="font-size:11px;color:var(--text-secondary);">2026/06/16 ・ 売掛金回収予定の徴求を依頼</div></div></div>
+
+      <div style="display:flex;gap:10px;margin-top:20px;">
+        <button class="btn-primary" onclick="toast('対応記録を保存しました')">対応を記録</button>
+        <button class="btn-secondary" onclick="toast('与信枠見直しの検討を起票しました')">与信枠見直しを起票</button>
+        <button class="btn-secondary" onclick="closeModal('modal-alert')">閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div style="padding:24px 20px 20px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+        <div style="width:32px;height:32px;background:linear-gradient(135deg,#1E6FD9,#00D4FF);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;">🏦</div>
+        <div>
+          <div class="logo-text">横浜銀行</div>
+          <div class="logo-sub">LENS · 融資審査AI</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:8px 12px;margin:0 8px 8px;background:rgba(0,212,255,0.08);border-radius:8px;">
+      <div style="font-size:11px;color:var(--ai-cyan);font-weight:600;margin-bottom:4px;">AI STATUS</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#94A3B8;">
+        <span class="glow-dot"></span> GPT-4.1 / EYS連携 オンライン
+      </div>
+    </div>
+
+    <nav style="flex:1;padding:8px 0;">
+      <div class="nav-item active" onclick="switchTab('dashboard',this)"><span class="nav-icon">⊞</span> ダッシュボード</div>
+      <div class="nav-item" onclick="switchTab('search',this)"><span class="nav-icon">⌕</span> 類似案件検索</div>
+      <div class="nav-item" onclick="switchTab('ringi',this)"><span class="nav-icon">✦</span> 稟議書ドラフト生成</div>
+      <div class="nav-item" onclick="switchTab('eval',this)"><span class="nav-icon">◎</span> 事業性評価</div>
+      <div class="nav-item" onclick="switchTab('nego',this)"><span class="nav-icon">⇄</span> 条件交渉支援</div>
+      <div class="nav-item" onclick="switchTab('approval',this)"><span class="nav-icon">✓</span> 稟議・承認</div>
+      <div class="nav-item" onclick="switchTab('risk',this)"><span class="nav-icon">⚠</span> 与信リスクアラート</div>
+
+      <div style="padding:16px 20px 8px;font-size:10px;color:#475569;letter-spacing:0.1em;font-weight:600;text-transform:uppercase;margin-top:12px;">管理</div>
+      <div class="nav-item" onclick="toast('監査ログは管理者権限が必要です')"><span class="nav-icon">≡</span> 監査ログ</div>
+      <div class="nav-item" onclick="toast('設定画面（デモ未実装）')"><span class="nav-icon">⚙</span> 設定</div>
+    </nav>
+
+    <div style="padding:16px 20px;border-top:1px solid rgba(255,255,255,0.08);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;background:linear-gradient(135deg,#2D5BE3,#00D4FF);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:white;font-size:14px;">鈴</div>
+        <div>
+          <div style="font-size:13px;color:white;font-weight:600;">鈴木 健太</div>
+          <div style="font-size:11px;color:#64748B;">融資部 審査グループ</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- ============ TAB: DASHBOARD ============ -->
+    <div class="tab-pane active" id="tab-dashboard">
+      <div class="page-header">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="section-title">おはようございます、鈴木さん ☀️</div>
+            <div class="section-sub" id="dashboard-date">— 本日の審査タスク</div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn-secondary" onclick="switchTab('search',document.querySelector('[onclick*=search]'))">⌕ 類似案件検索</button>
+            <button class="btn-primary" onclick="switchTab('ringi',document.querySelector('[onclick*=ringi]'))">＋ 稟議書を作成</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-area">
+        <!-- KPI Cards -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;">
+          <div class="stat-card">
+            <div class="kpi-number">14</div>
+            <div class="kpi-label">担当審査中案件</div>
+            <div class="kpi-delta neutral">うち期日3日以内：4件</div>
+          </div>
+          <div class="stat-card">
+            <div class="kpi-number">6</div>
+            <div class="kpi-label">稟議ドラフト作成待ち</div>
+            <div class="kpi-delta up">▲ AI生成で平均 -68% 工数</div>
+          </div>
+          <div class="stat-card">
+            <div class="kpi-number" style="color:#DC2626;">3</div>
+            <div class="kpi-label">重要リスクアラート</div>
+            <div class="kpi-delta down">▼ 要対応 2件</div>
+          </div>
+          <div class="stat-card">
+            <div class="kpi-number">¥38.2<span style="font-size:16px;">億</span></div>
+            <div class="kpi-label">審査中エクスポージャー合計</div>
+            <div class="kpi-delta neutral">先月比 +¥4.1億</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:24px;">
+          <!-- 本日のタスク -->
+          <div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+              <div class="section-title" style="font-size:16px;">本日の審査タスク</div>
+              <span class="tag">AI優先度順</span>
+            </div>
+
+            <div class="case-row" onclick="openCase()">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-size:15px;font-weight:700;">神奈川精密工業株式会社</div>
+                  <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">設備資金 ¥8.0億 ・ 新生産ライン投資 ・ 精密機器製造</div>
+                </div>
+                <span class="priority-high">期日 6/18</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+                <span class="source-badge ai-badge">✦ 稟議ドラフト準備完了</span>
+                <span class="source-badge" style="background:rgba(16,185,129,0.1);color:#059669;border-color:rgba(16,185,129,0.25);">行内格付 4・正常先</span>
+                <span class="source-badge">類似案件 7件</span>
+                <span class="source-badge" style="background:rgba(245,158,11,0.1);color:#D97706;border-color:rgba(245,158,11,0.2);">⚠ 借入依存度 要確認</span>
+              </div>
+            </div>
+
+            <div class="case-row" onclick="toast('デモでは神奈川精密工業の案件をご確認ください')">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-size:15px;font-weight:700;">湘南フードサービス株式会社</div>
+                  <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">運転資金 ¥1.2億 ・ 既存枠更新 ・ 飲食チェーン</div>
+                </div>
+                <span class="priority-mid">期日 6/19</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+                <span class="source-badge ai-badge">✦ 資料読取 完了</span>
+                <span class="source-badge">類似案件 12件</span>
+              </div>
+            </div>
+
+            <div class="case-row" onclick="toast('デモでは神奈川精密工業の案件をご確認ください')">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                <div>
+                  <div style="font-size:15px;font-weight:700;">横浜ロジスティクス株式会社</div>
+                  <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">設備資金 ¥3.5億 ・ 倉庫自動化 ・ 物流</div>
+                </div>
+                <span class="priority-mid">期日 6/20</span>
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+                <span class="source-badge">事業性評価 待ち</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- リスクサマリー -->
+          <div>
+            <div class="section-title" style="font-size:16px;margin-bottom:14px;">リスクアラート</div>
+            <div class="risk-card" style="margin-bottom:16px;">
+              <div class="risk-item" style="border:none;padding-top:0;">
+                <span class="risk-icon">🔴</span>
+                <div>
+                  <div class="risk-text" style="font-weight:600;">三浦電子工業（株）</div>
+                  <div class="risk-sub">主要取引先の民事再生報道を検知。売掛金回収リスク上昇。</div>
+                </div>
+              </div>
+              <div class="risk-item">
+                <span class="risk-icon">🔴</span>
+                <div>
+                  <div class="risk-text" style="font-weight:600;">ベイサイド建設（株）</div>
+                  <div class="risk-sub">直近試算表で粗利率 -6.2pt 悪化。事業計画未達兆候。</div>
+                </div>
+              </div>
+              <div class="risk-item" style="border:none;padding-bottom:0;">
+                <span class="risk-icon">🟡</span>
+                <div>
+                  <div class="risk-text" style="font-weight:600;">神奈川精密工業（株）</div>
+                  <div class="risk-sub">借入依存度が前期比 +8.4pt。設備投資前提で要モニタリング。</div>
+                </div>
+              </div>
+            </div>
+            <button class="btn-secondary" style="width:100%;" onclick="switchTab('risk',document.querySelector('[onclick*=risk]'))">すべてのアラートを見る →</button>
+
+            <div class="ai-card" style="margin-top:16px;">
+              <div style="font-size:12px;font-weight:700;color:#0099BB;margin-bottom:8px;">✦ AI 今週のサマリー</div>
+              <div style="font-size:12.5px;color:var(--text-secondary);line-height:1.7;">
+                担当14案件のうち <strong style="color:var(--text-primary);">11案件で稟議ドラフトをAI生成済</strong>。資料読取により転記工数を約 <strong style="color:var(--text-primary);">42時間/月</strong> 削減見込み。要注意先は3社、うち1社（三浦電子）は即時面談を推奨します。
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: 類似案件検索 (F-01) ============ -->
+    <div class="tab-pane" id="tab-search">
+      <div class="page-header">
+        <div class="section-title">類似案件検索 <span class="tag" style="vertical-align:middle;margin-left:8px;">F-01</span></div>
+        <div class="section-sub">過去の稟議書・補足書・審査コメントから、現在案件に類似する案件をAIが提示します</div>
+      </div>
+      <div class="content-area">
+        <div class="info-card" style="margin-bottom:24px;">
+          <div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;margin-bottom:14px;">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">キーワード（事業内容・用途・課題）</div>
+              <input class="search-input" id="search-kw" value="精密機器 設備投資 新生産ライン 省力化">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">業種</div>
+              <select class="search-input"><option>精密機器・電子部品製造</option><option>一般機械</option><option>金属製品</option></select>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">融資種別</div>
+              <select class="search-input"><option>設備資金</option><option>運転資金</option><option>条件変更</option></select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px;">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">地域・商圏</div>
+              <select class="search-input"><option>神奈川県内</option><option>南関東</option><option>全国</option></select>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">売上規模</div>
+              <select class="search-input"><option>30〜60億円</option><option>10〜30億円</option><option>60〜100億円</option></select>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">決裁条件（担保・保証等）</div>
+              <input class="search-input" value="工場担保 信用保証協会">
+            </div>
+          </div>
+          <button class="btn-ai" id="search-btn" onclick="runSearch()">⌕ AI類似案件検索</button>
+        </div>
+
+        <div id="search-placeholder" style="text-align:center;padding:60px 0;color:var(--text-secondary);">
+          検索条件を入力し「AI類似案件検索」を実行してください
+        </div>
+
+        <div id="search-results" style="display:none;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <div style="font-size:14px;color:var(--text-secondary);">過去稟議 <strong style="color:var(--text-primary);">3,284件</strong> から類似度の高い <strong style="color:var(--text-primary);">7件</strong> を抽出 <span style="color:#0099BB;font-weight:600;">— 案件を選択すると稟議書作成へ進みます</span></div>
+            <span class="source-badge ai-badge">✦ ベクトル検索 + 重要文言抽出</span>
+          </div>
+
+          <div class="case-row" onclick="selectCaseToRingi('A社（精密部品製造）2023-設-0412')">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:15px;font-weight:700;">A社（精密部品製造）— 設備資金 ¥6.5億</div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">2023年 ・ 新工場ライン増設 ・ 工場担保＋保証協会 ・ <strong style="color:var(--success);">承認</strong></div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:22px;font-weight:700;color:var(--primary);">94<span style="font-size:13px;">%</span></div>
+                <div style="font-size:10px;color:var(--text-secondary);">類似度</div>
+              </div>
+            </div>
+            <div style="background:#F8FAFC;border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;color:var(--text-secondary);line-height:1.7;">
+              <strong style="color:var(--text-primary);">審査論点要約：</strong> 設備投資による償却前利益の増加で返済原資を確保。受注内示書により稼働率を裏付け。<strong style="color:#D97706;">リスク論点：</strong>投資後2年間の借入依存度上昇、減価償却負担の先行。
+            </div>
+          </div>
+
+          <div class="case-row" onclick="selectCaseToRingi('B社（電子部品製造）2022-設-0731')">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:15px;font-weight:700;">B社（電子部品製造）— 設備資金 ¥9.2億</div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">2022年 ・ 省力化設備導入 ・ 補助金併用 ・ <strong style="color:var(--success);">承認（金利スワップ付）</strong></div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:22px;font-weight:700;color:var(--primary);">89<span style="font-size:13px;">%</span></div>
+                <div style="font-size:10px;color:var(--text-secondary);">類似度</div>
+              </div>
+            </div>
+            <div style="background:#F8FAFC;border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;color:var(--text-secondary);line-height:1.7;">
+              <strong style="color:var(--text-primary);">審査論点要約：</strong> ものづくり補助金3,000万円を自己資金に充当し実質負担を圧縮。<strong style="color:#D97706;">リスク論点：</strong>主要販売先1社への売上集中（45%）に対し、取引分散方針を確認。
+            </div>
+          </div>
+
+          <div class="case-row" onclick="selectCaseToRingi('C社（金属加工）2024-設-0155')">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:15px;font-weight:700;">C社（金属加工）— 設備資金 ¥7.8億</div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">2024年 ・ 老朽設備更新 ・ 工場担保 ・ <strong style="color:#D97706;">条件付承認</strong></div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:22px;font-weight:700;color:var(--primary);">82<span style="font-size:13px;">%</span></div>
+                <div style="font-size:10px;color:var(--text-secondary);">類似度</div>
+              </div>
+            </div>
+            <div style="background:#F8FAFC;border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;color:var(--text-secondary);line-height:1.7;">
+              <strong style="color:var(--text-primary);">審査論点要約：</strong> 返済期間を15年に長期化し月次返済負担を平準化。<strong style="color:#D97706;">リスク論点：</strong>財務制限条項（自己資本比率20%維持）を付帯。
+            </div>
+          </div>
+
+          <div style="text-align:center;margin-top:8px;">
+            <button class="btn-ai" onclick="switchTab('ringi',document.querySelector('[onclick*=ringi]'))">✦ この類似案件をベースに稟議書を生成 →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: 稟議書ドラフト生成 (F-02 / F-03) ============ -->
+    <div class="tab-pane" id="tab-ringi">
+      <div class="page-header">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="section-title">稟議書ドラフト生成 <span class="tag" style="vertical-align:middle;margin-left:8px;">F-02 / F-03</span></div>
+            <div class="section-sub">神奈川精密工業株式会社 ・ 設備資金 ¥8.0億 ・ 法人融資テンプレート</div>
+            <div id="ringi-base" style="display:none;margin-top:8px;font-size:12px;color:#0099BB;background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.25);border-radius:8px;padding:6px 12px;width:fit-content;">✦ ベース類似案件：<strong id="ringi-base-name"></strong></div>
+          </div>
+          <span class="scenario-badge" style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,212,255,0.1);color:#0099BB;border:1px solid rgba(0,212,255,0.25);border-radius:999px;padding:4px 14px;font-size:12px;font-weight:600;">案件ID: 2026-設-0288</span>
+        </div>
+      </div>
+      <div class="content-area">
+        <!-- EYS 案件情報取得 -->
+        <div class="info-card" id="eys-panel" style="margin-bottom:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div style="font-size:14px;font-weight:700;">🔗 案件情報の取得（EYS連携）</div>
+            <span class="source-badge ai-badge">✦ CIF番号 / 法人名から自動取得</span>
+          </div>
+          <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="flex:1;min-width:150px;">
+              <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:5px;">CIF番号</div>
+              <input class="search-input" id="eys-cif" value="0023-558814" placeholder="例：0023-558814">
+            </div>
+            <div style="flex:2;min-width:220px;">
+              <div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:5px;">法人名</div>
+              <input class="search-input" id="eys-corp" value="神奈川精密工業株式会社" placeholder="法人名を入力">
+            </div>
+            <button class="btn-ai" id="eys-btn" onclick="fetchEYS()" style="white-space:nowrap;">🔍 EYSから取得</button>
+          </div>
+
+          <div id="eys-result" style="display:none;margin-top:18px;">
+            <div style="border-top:1px solid var(--border);padding-top:16px;">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+                <span class="glow-dot"></span>
+                <span style="font-size:13px;font-weight:700;">EYSから企業情報を取得しました</span>
+                <span class="source-badge">CIF: 0023-558814</span>
+                <span class="source-badge" style="background:rgba(16,185,129,0.1);color:#059669;border-color:rgba(16,185,129,0.25);">行内格付 4・正常先</span>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
+                <div style="background:#F8FAFC;border-radius:10px;padding:12px;"><div style="font-size:11px;color:var(--text-secondary);">法人名</div><div style="font-size:13px;font-weight:700;margin-top:3px;">神奈川精密工業（株）</div></div>
+                <div style="background:#F8FAFC;border-radius:10px;padding:12px;"><div style="font-size:11px;color:var(--text-secondary);">業種</div><div style="font-size:13px;font-weight:700;margin-top:3px;">精密機器・電子部品製造</div></div>
+                <div style="background:#F8FAFC;border-radius:10px;padding:12px;"><div style="font-size:11px;color:var(--text-secondary);">代表者 / 設立</div><div style="font-size:13px;font-weight:700;margin-top:3px;">中村 博之 / 1991年</div></div>
+                <div style="background:#F8FAFC;border-radius:10px;padding:12px;"><div style="font-size:11px;color:var(--text-secondary);">資本金 / 従業員</div><div style="font-size:13px;font-weight:700;margin-top:3px;">8,000万円 / 142名</div></div>
+                <div style="background:#F8FAFC;border-radius:10px;padding:12px;"><div style="font-size:11px;color:var(--text-secondary);">売上高（第38期）</div><div style="font-size:13px;font-weight:700;margin-top:3px;">41.5億円</div></div>
+                <div style="background:#F8FAFC;border-radius:10px;padding:12px;"><div style="font-size:11px;color:var(--text-secondary);">当行 既存与信残高</div><div style="font-size:13px;font-weight:700;margin-top:3px;">6.8億円</div></div>
+                <div style="background:#F8FAFC;border-radius:10px;padding:12px;"><div style="font-size:11px;color:var(--text-secondary);">取引年数 / 区分</div><div style="font-size:13px;font-weight:700;margin-top:3px;">18年 / メイン行</div></div>
+                <div style="background:#F8FAFC;border-radius:10px;padding:12px;"><div style="font-size:11px;color:var(--text-secondary);">主要販売先</div><div style="font-size:13px;font-weight:700;margin-top:3px;">A社（自動車部品）</div></div>
+              </div>
+              <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+                <button class="btn-ai" onclick="searchFromEYS()">⌕ 類似案件を検索</button>
+                <button class="btn-primary" onclick="startRingiFromEYS()">✦ この情報で稟議書を作成</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="ringi-workspace" style="display:none;">
+        <div style="display:grid;grid-template-columns:320px 1fr;gap:24px;align-items:start;">
+          <!-- Left: 取込資料 + 入力 -->
+          <div>
+            <div class="info-card" style="margin-bottom:16px;">
+              <div style="font-size:13px;font-weight:700;margin-bottom:14px;">📎 取込済資料（OCR）</div>
+              <div class="doc-row"><span>📄</span><div style="flex:1;"><div style="font-weight:600;">第38期 決算書.pdf</div><div style="font-size:11px;color:var(--text-secondary);">読取完了 ・ 信頼度 高</div></div><span class="conf-pill conf-high">98%</span></div>
+              <div class="doc-row"><span>📊</span><div style="flex:1;"><div style="font-weight:600;">設備投資計画書.xlsx</div><div style="font-size:11px;color:var(--text-secondary);">読取完了</div></div><span class="conf-pill conf-high">95%</span></div>
+              <div class="doc-row"><span>📈</span><div style="flex:1;"><div style="font-weight:600;">資金繰り表_5期分.xlsx</div><div style="font-size:11px;color:var(--text-secondary);">読取完了</div></div><span class="conf-pill conf-high">96%</span></div>
+              <div class="doc-row"><span>📝</span><div style="flex:1;"><div style="font-weight:600;">受注内示書（A社向け）.pdf</div><div style="font-size:11px;color:var(--text-secondary);">一部要確認</div></div><span class="conf-pill conf-low">72%</span></div>
+              <button class="btn-secondary" style="width:100%;margin-top:8px;font-size:12px;" onclick="toast('資料アップロード（デモ）')">＋ 資料を追加</button>
+            </div>
+
+            <div class="info-card">
+              <div style="font-size:13px;font-weight:700;margin-bottom:14px;">案件入力</div>
+              <div style="margin-bottom:12px;"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:5px;">融資目的</div><select class="search-input"><option>設備資金（新生産ライン投資）</option></select></div>
+              <div style="margin-bottom:12px;"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:5px;">テンプレート種別</div><select class="search-input"><option>法人融資（設備）</option><option>運転資金</option><option>条件変更</option></select></div>
+              <div style="margin-bottom:16px;"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:5px;">案件概要</div><textarea class="search-input" rows="4" style="resize:none;">主力の自動車向け精密部品の増産対応。新生産ライン（自動加工機3台）導入により生産能力を1.4倍へ。A社からの受注内示を背景に申込。</textarea></div>
+              <button class="btn-ai" id="ringi-btn" style="width:100%;justify-content:center;" onclick="generateRingi()">✦ 稟議書ドラフトを生成</button>
+            </div>
+          </div>
+
+          <!-- Right: 生成結果 -->
+          <div>
+            <!-- 資料読取結果 (F-03) -->
+            <div class="info-card" style="margin-bottom:16px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                <div style="font-size:13px;font-weight:700;">📊 資料読取・数値転記結果 <span class="tag" style="margin-left:6px;">F-03</span></div>
+                <span class="source-badge ai-badge">✦ OCR + 表認識</span>
+              </div>
+              <table class="extract-table">
+                <thead><tr><th>項目</th><th>抽出値</th><th>元資料</th><th>信頼度</th></tr></thead>
+                <tbody>
+                  <tr><td>売上高（第38期）</td><td><strong>41.5億円</strong></td><td>決算書 P.2</td><td><span class="conf-pill conf-high">98%</span></td></tr>
+                  <tr><td>営業利益</td><td><strong>2.61億円</strong></td><td>決算書 P.2</td><td><span class="conf-pill conf-high">98%</span></td></tr>
+                  <tr><td>借入金残高</td><td><strong>14.8億円</strong></td><td>決算書 P.5</td><td><span class="conf-pill conf-high">97%</span></td></tr>
+                  <tr><td>現預金</td><td><strong>6.2億円</strong></td><td>決算書 P.5</td><td><span class="conf-pill conf-high">99%</span></td></tr>
+                  <tr><td>設備投資額</td><td><strong>8.0億円</strong></td><td>投資計画書</td><td><span class="conf-pill conf-high">95%</span></td></tr>
+                  <tr style="background:rgba(245,158,11,0.05);"><td>受注内示額（年間）</td><td><mark class="uncertain">約12.0億円</mark></td><td>受注内示書</td><td><span class="conf-pill conf-low">72% 要確認</span></td></tr>
+                </tbody>
+              </table>
+              <div style="font-size:11.5px;color:#D97706;margin-top:10px;">⚠ 黄色ハイライトは読取信頼度が低い項目です。原本での確認を推奨します。</div>
+            </div>
+
+            <!-- 稟議書ドラフト本体 -->
+            <div id="ringi-placeholder" style="background:white;border:1px dashed var(--border);border-radius:16px;text-align:center;padding:60px 24px;color:var(--text-secondary);">
+              <div style="font-size:40px;margin-bottom:12px;">✦</div>
+              左の「稟議書ドラフトを生成」を実行すると、<br>類似案件と取込資料をもとにAIが稟議書を起案します
+            </div>
+
+            <div id="ringi-progress" style="display:none;background:white;border:1px solid var(--border);border-radius:16px;padding:32px;">
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;"><span class="spinner" style="font-size:20px;color:var(--ai-cyan);">⟳</span><span id="ringi-status" style="font-size:14px;font-weight:600;">類似案件を抽出中...</span></div>
+              <div class="progress-bar"><div class="progress-fill" id="ringi-fill" style="width:0%;background:linear-gradient(90deg,#1E6FD9,#00D4FF);"></div></div>
+            </div>
+
+            <div id="ringi-content" style="display:none;">
+              <div class="info-card" style="border-top:3px solid var(--ai-cyan);">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                  <div style="font-size:16px;font-weight:700;">稟議書ドラフト <span class="source-badge ai-badge" style="margin-left:8px;">✦ AI生成 v1</span> <span class="source-badge" style="margin-left:4px;background:rgba(16,185,129,0.1);color:#059669;border-color:rgba(16,185,129,0.25);">行内格付 4・正常先</span></div>
+                  <div style="display:flex;gap:8px;">
+                    <button class="btn-secondary" style="font-size:12px;padding:8px 14px;" onclick="openModal('modal-ringi')">📄 Word出力</button>
+                    <button class="btn-secondary" style="font-size:12px;padding:8px 14px;" onclick="openModal('modal-ringi')">PDF</button>
+                  </div>
+                </div>
+                <div style="font-size:11.5px;color:var(--text-secondary);margin-bottom:6px;">参照元：類似案件A社(2023-設-0412)・B社(2022-設-0731)／取込資料6点 ・ <span style="color:#0099BB;">出典は</span><span class="cite">①</span><span style="color:#0099BB;">で表示</span></div>
+
+                <div class="ringi-section">
+                  <div class="ringi-label">① 案件概要</div>
+                  <div class="ringi-body">神奈川精密工業株式会社（神奈川県厚木市、資本金8,000万円、従業員142名）より、主力の自動車向け精密部品の増産対応として、新生産ライン（自動加工機3台）導入に係る設備資金 <strong>8.0億円</strong><span class="cite">①</span> の申込を受けた。本投資により生産能力は約1.4倍に拡大する見込み。</div>
+                </div>
+
+                <div class="ringi-section">
+                  <div class="ringi-label">② 融資背景・資金需要</div>
+                  <div class="ringi-body">大手部品メーカーA社からの<mark class="uncertain">年間約12億円規模</mark>の受注内示<span class="cite">②</span>を背景に、現行設備では生産能力が逼迫。EVシフトに伴う軽量・高精度部品の需要拡大を取り込むための先行投資であり、資金使途は設備購入（6.8億円）・付帯工事（1.2億円）で妥当と判断される。</div>
+                </div>
+
+                <div class="ringi-section">
+                  <div class="ringi-label">③ 審査ポイント（着眼点）</div>
+                  <div class="ringi-body">
+                    ・<strong>返済原資：</strong>償却前営業利益は第38期 約3.9億円<span class="cite">①</span>。投資後の増産効果で営業CFの増加が見込まれ、年間返済額（約5,300万円）に対し十分な水準。<br>
+                    ・<strong>担保・保証：</strong>本社工場（評価額9.4億円）を担保とし、一部に信用保証協会保証を併用。類似案件A社と同等の保全構成<span class="cite">①</span>。<br>
+                    ・<strong>稼働率の裏付け：</strong>受注内示書により初年度稼働率の目処は立つが、内示の確度は原本確認を要す<span class="cite">②</span>。
+                  </div>
+                </div>
+
+                <div class="ringi-section">
+                  <div class="ringi-label">④ リスク要因</div>
+                  <div class="ringi-body">
+                    ・投資後2年間は<strong style="color:#D97706;">借入依存度が前期比+8.4pt上昇</strong>し、減価償却負担が先行する（類似案件A社でも同様の論点）<span class="cite">①</span>。<br>
+                    ・<strong style="color:#D97706;">A社向け売上集中</strong>。受注先の業況変動が返済に影響するため、取引分散方針の確認が必要。<br>
+                    ・自動車部品市場のEVシフトに伴う需要構造変化。
+                  </div>
+                </div>
+
+                <div class="ringi-section">
+                  <div class="ringi-label">⑤ 推奨条件案</div>
+                  <div class="ringi-body">
+                    <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                      <tr style="border-bottom:1px solid #F1F5F9;"><td style="padding:6px 0;color:var(--text-secondary);width:120px;">融資金額</td><td style="font-weight:600;">8.0億円</td></tr>
+                      <tr style="border-bottom:1px solid #F1F5F9;"><td style="padding:6px 0;color:var(--text-secondary);">返済期間</td><td style="font-weight:600;">12年（元金据置6ヶ月）</td></tr>
+                      <tr style="border-bottom:1px solid #F1F5F9;"><td style="padding:6px 0;color:var(--text-secondary);">適用金利</td><td style="font-weight:600;">基準金利＋0.6%（金利スワップ提案可）</td></tr>
+                      <tr style="border-bottom:1px solid #F1F5F9;"><td style="padding:6px 0;color:var(--text-secondary);">担保・保証</td><td style="font-weight:600;">本社工場担保＋信用保証協会（30%）</td></tr>
+                      <tr><td style="padding:6px 0;color:var(--text-secondary);">財務制限条項</td><td style="font-weight:600;">自己資本比率25%維持</td></tr>
+                    </table>
+                  </div>
+                </div>
+
+                <div class="ringi-section">
+                  <div class="ringi-label">⑥ 補足確認事項</div>
+                  <div class="ringi-body">
+                    ・A社受注内示書の<strong>原本確認</strong>および確定発注見込み時期のヒアリング。<br>
+                    ・ものづくり補助金（最大3,000万円）の活用可否（類似案件B社で実績あり）<span class="cite">①</span>。<br>
+                    ・既存借入のリスケ有無、他行取引状況の確認。
+                  </div>
+                </div>
+
+                <div style="background:linear-gradient(135deg,rgba(0,212,255,0.06),rgba(30,111,217,0.06));border:1px solid rgba(0,212,255,0.2);border-radius:10px;padding:14px;margin-top:16px;font-size:12px;color:var(--text-secondary);line-height:1.7;">
+                  <strong style="color:#0099BB;">🤖 AIからの注記：</strong> 本ドラフトは類似案件と取込資料に基づく<strong style="color:var(--text-primary);">起案支援</strong>です。最終承認は審査担当者による確認を前提とします。<mark class="uncertain">黄色ハイライト</mark>箇所は根拠資料の確度が低いため、原本での裏付けをお願いします。
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;margin-top:16px;">
+                <button class="btn-ai" onclick="routeForApproval()">📤 承認へ回す</button>
+                <button class="btn-primary" onclick="switchTab('eval',document.querySelector('[onclick*=eval]'))">◎ 事業性評価へ進む →</button>
+                <button class="btn-secondary" onclick="toast('ドラフトを編集モードで開きました')">✎ 編集する</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: 稟議・承認 ============ -->
+    <div class="tab-pane" id="tab-approval">
+      <div class="page-header">
+        <div class="section-title">稟議・承認 <span class="tag" style="vertical-align:middle;margin-left:8px;">承認ワークフロー</span></div>
+        <div class="section-sub">作成した稟議書を承認ルートへ回付し、決裁状況を管理します</div>
+      </div>
+      <div class="content-area">
+
+        <!-- 空状態 -->
+        <div id="approval-empty" style="text-align:center;padding:70px 24px;color:var(--text-secondary);">
+          <div style="font-size:42px;margin-bottom:12px;">📥</div>
+          現在、承認待ちの稟議書はありません。<br>
+          稟議書ドラフト画面で <strong style="color:var(--text-primary);">「📤 承認へ回す」</strong> を実行すると、ここに表示されます。
+          <div style="margin-top:18px;"><button class="btn-secondary" onclick="switchTab('ringi',document.querySelector('[onclick*=ringi]'))">稟議書ドラフト画面へ →</button></div>
+        </div>
+
+        <!-- 回付済み -->
+        <div id="approval-content" style="display:none;">
+          <!-- 案件ヘッダ -->
+          <div class="info-card" style="margin-bottom:20px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+              <div>
+                <div style="font-size:17px;font-weight:700;">神奈川精密工業株式会社 <span class="source-badge" style="margin-left:6px;">案件ID: 2026-設-0288</span></div>
+                <div style="font-size:12.5px;color:var(--text-secondary);margin-top:5px;">設備資金 ¥8.0億 ・ 申請者：鈴木 健太（融資部 審査グループ） ・ 申請日：2026/06/17</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="source-badge" style="background:rgba(16,185,129,0.1);color:#059669;border-color:rgba(16,185,129,0.25);">行内格付 4・正常先</span>
+                <div id="approval-state-badge" style="margin-top:8px;font-size:13px;font-weight:700;color:#D97706;">● 審査グループ 承認待ち</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 承認ルート -->
+          <div class="info-card" style="margin-bottom:20px;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:18px;">承認ルート</div>
+            <div id="approval-route" style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px;"></div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:20px;">
+            <!-- 稟議書サマリー -->
+            <div class="info-card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <div style="font-size:13px;font-weight:700;">稟議書サマリー</div>
+                <button class="btn-secondary" style="font-size:12px;padding:6px 12px;" onclick="openModal('modal-ringi')">📄 稟議書全文を見る</button>
+              </div>
+              <div style="font-size:12.5px;line-height:1.8;color:var(--text-primary);">
+                <div style="margin-bottom:10px;"><strong style="color:var(--primary);">案件概要：</strong>新生産ライン（自動加工機3台）導入に係る設備資金8.0億円。生産能力を約1.4倍へ。</div>
+                <div style="margin-bottom:10px;"><strong style="color:var(--primary);">返済原資：</strong>償却前営業利益 約3.9億円。年間返済額（約5,300万円）に対し十分。</div>
+                <div style="margin-bottom:10px;"><strong style="color:#D97706;">リスク：</strong>投資後2年は借入依存度+8.4pt上昇、A社向け売上集中。</div>
+                <div style="background:#F8FAFC;border-radius:8px;padding:12px;margin-top:6px;">
+                  <strong>推奨条件：</strong>12年（元金据置6ヶ月）／基準金利＋0.6%／本社工場担保＋保証協会30%／自己資本比率25%維持
+                </div>
+              </div>
+            </div>
+
+            <!-- 承認アクション -->
+            <div>
+              <div class="info-card" id="approval-action" style="border-top:3px solid var(--ai-cyan);margin-bottom:16px;">
+                <div style="font-size:13px;font-weight:700;margin-bottom:12px;">承認アクション <span style="font-size:11px;color:var(--text-secondary);font-weight:500;">（審査グループ）</span></div>
+                <textarea class="search-input" id="approval-comment" rows="3" style="resize:none;margin-bottom:12px;" placeholder="コメント・付帯条件を入力（任意）"></textarea>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                  <button class="btn-primary" style="width:100%;" onclick="approveStep('承認')">✓ 承認して次へ回付</button>
+                  <button class="btn-secondary" style="width:100%;" onclick="approveStep('条件付承認')">△ 条件付で承認</button>
+                  <button class="btn-secondary" style="width:100%;color:#DC2626;border-color:rgba(239,68,68,0.3);" onclick="rejectStep()">↩ 差戻し</button>
+                </div>
+              </div>
+              <div class="info-card">
+                <div style="font-size:13px;font-weight:700;margin-bottom:12px;">承認履歴</div>
+                <div id="approval-history" style="font-size:12.5px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: 事業性評価 (F-04) ============ -->
+    <div class="tab-pane" id="tab-eval">
+      <div class="page-header">
+        <div class="section-title">事業性評価 <span class="tag" style="vertical-align:middle;margin-left:8px;">F-04</span></div>
+        <div class="section-sub">神奈川精密工業株式会社 ・ AIが事業内容・計画・市場環境を多面的に評価</div>
+      </div>
+      <div class="content-area">
+        <div id="eval-placeholder" style="text-align:center;padding:50px 0;">
+          <button class="btn-ai" onclick="generateEval()">◎ 事業性評価を生成</button>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:14px;">取込資料・財務データ・市場情報をもとにAIが評価コメントを生成します</div>
+        </div>
+
+        <div id="eval-content" style="display:none;">
+          <!-- 行内格付け -->
+          <div class="info-card" style="margin-bottom:24px;border-top:3px solid var(--primary);">
+            <div style="display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:18px;">
+                <div style="text-align:center;background:linear-gradient(135deg,#1E6FD9,#00D4FF);color:white;border-radius:14px;padding:12px 22px;min-width:104px;box-shadow:0 4px 16px rgba(30,111,217,0.3);">
+                  <div style="font-size:11px;font-weight:600;opacity:0.92;">行内格付</div>
+                  <div style="font-size:42px;font-weight:800;line-height:1.05;">4</div>
+                  <div style="font-size:10px;font-weight:600;opacity:0.92;">／ 10段階</div>
+                </div>
+                <div>
+                  <div style="font-size:14px;font-weight:700;color:var(--text-primary);">債務者区分：<span style="color:var(--success);">正常先</span></div>
+                  <div style="font-size:12px;color:var(--text-secondary);margin-top:7px;">前回格付 <strong>5</strong> → 今回 <strong style="color:var(--primary);">4</strong> <span style="color:var(--success);font-weight:700;">▲ 1ノッチ改善</span></div>
+                  <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">デフォルト確率（PD）目安：<strong style="color:var(--text-primary);">0.8%</strong></div>
+                </div>
+              </div>
+              <div style="flex:1;min-width:300px;border-left:1px solid var(--border);padding-left:24px;">
+                <div style="font-size:12px;font-weight:700;color:#0099BB;margin-bottom:6px;">✦ 格付算出根拠（AI）</div>
+                <div style="font-size:12.5px;color:var(--text-secondary);line-height:1.7;">直近3期の増収増益と償却前利益によるキャッシュフロー改善を反映し定量評価が向上。設備投資に伴う<strong style="color:#D97706;">借入依存度の上昇は注視要因</strong>だが、財務内容・保全状況を踏まえ <strong style="color:var(--text-primary);">正常先（格付4）</strong> と判定。</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 総合スコア + 財務推移 -->
+          <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:24px;margin-bottom:24px;">
+            <div class="info-card" style="text-align:center;">
+              <div style="font-size:13px;font-weight:700;margin-bottom:14px;">総合評価スコア</div>
+              <div class="gauge-wrap">
+                <canvas id="gaugeChart" width="160" height="160"></canvas>
+                <div class="gauge-center"><div style="font-size:34px;font-weight:700;color:var(--primary);">B+</div><div style="font-size:11px;color:var(--text-secondary);">融資適格</div></div>
+              </div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:12px;line-height:1.6;">7観点の加重平均。<br>類似承認案件の中央値（B）を上回る水準。</div>
+            </div>
+            <div class="info-card">
+              <div style="font-size:13px;font-weight:700;margin-bottom:14px;">業績推移（決算書より自動取込）</div>
+              <canvas id="finChart" height="150"></canvas>
+            </div>
+          </div>
+
+          <!-- 7観点評価 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+            <div class="info-card">
+              <div style="font-size:13px;font-weight:700;margin-bottom:18px;">評価観点別スコア</div>
+              <div style="display:flex;flex-direction:column;gap:16px;">
+                <div><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:6px;"><span>事業の実現可能性</span><span>4.2/5</span></div><div class="score-bar"><div class="score-fill ev-bar" data-w="84"></div></div></div>
+                <div><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:6px;"><span>収益性</span><span>4.0/5</span></div><div class="score-bar"><div class="score-fill ev-bar" data-w="80"></div></div></div>
+                <div><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:6px;"><span>成長性</span><span>4.4/5</span></div><div class="score-bar"><div class="score-fill ev-bar" data-w="88"></div></div></div>
+                <div><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:6px;"><span>市場競争力</span><span>3.6/5</span></div><div class="score-bar"><div class="score-fill ev-bar" data-w="72"></div></div></div>
+                <div><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:6px;"><span>経営体制</span><span>3.8/5</span></div><div class="score-bar"><div class="score-fill ev-bar" data-w="76"></div></div></div>
+                <div><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:6px;"><span>資金使途妥当性</span><span>4.5/5</span></div><div class="score-bar"><div class="score-fill ev-bar" data-w="90"></div></div></div>
+                <div><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:6px;"><span>返済原資の確実性</span><span>3.7/5</span></div><div class="score-bar"><div class="score-fill ev-bar" data-w="74"></div></div></div>
+              </div>
+            </div>
+
+            <div>
+              <div class="ai-card" style="margin-bottom:16px;">
+                <div style="font-size:12px;font-weight:700;color:#0099BB;margin-bottom:10px;">✦ 総合所見（AI生成）</div>
+                <div style="font-size:13px;color:var(--text-primary);line-height:1.8;">
+                  自動車向け精密部品でEVシフトの追い風を捉えた<strong>成長性は高い</strong>。設備投資による生産能力1.4倍化は受注内示と整合し、<strong>資金使途は妥当</strong>。償却前利益でみた返済原資は確保されるが、<strong style="color:#D97706;">A社への売上集中と投資後の借入依存度上昇</strong>が主要論点。取引分散の進捗と受注内示の確度を継続確認することを条件に、<strong style="color:var(--success);">融資適格（B+）</strong>と評価する。
+                </div>
+              </div>
+              <div class="info-card">
+                <div style="font-size:13px;font-weight:700;margin-bottom:12px;">観点別コメント</div>
+                <div style="font-size:12.5px;line-height:1.7;color:var(--text-secondary);">
+                  <div style="margin-bottom:10px;"><strong style="color:var(--success);">◎ 成長性：</strong>EV向け高精度部品の需要拡大。直近3期の売上CAGR +10.2%。</div>
+                  <div style="margin-bottom:10px;"><strong style="color:var(--success);">◎ 資金使途：</strong>設備購入＋付帯工事で内訳明確。過大投資の懸念は小さい。</div>
+                  <div style="margin-bottom:10px;"><strong style="color:#D97706;">△ 市場競争力：</strong>同業大手との価格競争。差別化は高精度加工技術に依存。</div>
+                  <div><strong style="color:#D97706;">△ 返済原資：</strong>A社受注の確度が前提。分散が進むまではモニタリング要。</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="text-align:center;margin-top:20px;">
+            <button class="btn-primary" onclick="switchTab('nego',document.querySelector('[onclick*=nego]'))">⇄ 条件交渉支援へ進む →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: 条件交渉支援 (F-05) ============ -->
+    <div class="tab-pane" id="tab-nego">
+      <div class="page-header">
+        <div class="section-title">条件交渉支援 <span class="tag" style="vertical-align:middle;margin-left:8px;">F-05</span></div>
+        <div class="section-sub">神奈川精密工業株式会社 ・ 顧客は金利引下げを要望。AIが交渉方針・説明文案・想定問答を提案</div>
+      </div>
+      <div class="content-area">
+        <div style="display:grid;grid-template-columns:300px 1fr;gap:24px;align-items:start;">
+          <div class="info-card">
+            <div style="font-size:13px;font-weight:700;margin-bottom:14px;">交渉対象を選択</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" checked> 金利</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox" checked> 担保・保証</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox"> 返済期間</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox"> 元金据置</label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;"><input type="checkbox"> 財務制限条項</label>
+            </div>
+            <div style="margin:16px 0;"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px;">顧客タイプ</div><select class="search-input"><option>守りの経営・金利に敏感</option><option>成長志向・スピード重視</option></select></div>
+            <button class="btn-ai" id="nego-btn" style="width:100%;justify-content:center;" onclick="generateNego()">⇄ 交渉スクリプトを生成</button>
+          </div>
+
+          <div>
+            <div id="nego-placeholder" style="background:white;border:1px dashed var(--border);border-radius:16px;text-align:center;padding:60px 24px;color:var(--text-secondary);">
+              交渉対象を選び「交渉スクリプトを生成」を実行してください
+            </div>
+            <div id="nego-content" style="display:none;">
+              <div class="ai-card" style="margin-bottom:16px;">
+                <div style="font-size:12px;font-weight:700;color:#0099BB;margin-bottom:8px;">✦ 交渉方針</div>
+                <div style="font-size:13px;color:var(--text-primary);line-height:1.8;">金利の引下げ要望に対しては、表面金利の値引きではなく <strong>「ものづくり補助金の活用」「金利スワップによる固定化」</strong> で<strong>実質負担と将来リスクを低減</strong>する代替案を軸に交渉。保全（保証協会30%）を維持しつつ、Win-Winの着地を目指す。</div>
+              </div>
+
+              <div class="nego-card">
+                <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:10px;">💬 顧客向け説明文案</div>
+                <div style="font-size:13px;line-height:1.85;color:var(--text-primary);background:#F8FAFC;border-radius:10px;padding:14px;">
+                  「金利の件、承知しました。表面金利の引下げは難しい局面ですが、御社の実質的なご負担を下げる方法をご提案させてください。まず<strong>ものづくり補助金（最大3,000万円）</strong>を自己資金に充当することで、借入元本そのものを圧縮できます。加えて<strong>金利スワップ</strong>で固定化すれば、今後の金利上昇局面でも返済額が変わらず、資金繰りの見通しが立てやすくなります。」
+                </div>
+              </div>
+
+              <div class="nego-card">
+                <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:12px;">❓ 想定問答</div>
+                <div style="margin-bottom:14px;">
+                  <div class="qa-q">Q. 補助金の申請は難しいのでは？うちでできるのか？</div>
+                  <div class="qa-a">A. 採択実績のある提携先専門家をご紹介可能です。同業のB社様も当行サポートで採択されています。申請書類の要点は当行でも併走します。</div>
+                </div>
+                <div style="margin-bottom:14px;">
+                  <div class="qa-q">Q. 金利スワップとは具体的にどういうもの？</div>
+                  <div class="qa-a">A. 変動金利を実質固定化する仕組みです。金利が上昇しても返済額が一定となり、12年の長期返済における金利上昇リスクをヘッジできます。</div>
+                </div>
+                <div>
+                  <div class="qa-q">Q. 保証協会の保証料が負担に感じる。</div>
+                  <div class="qa-a">A. 保証割合を30%に抑え、残りはプロパー融資とすることで保証料負担を軽減しています。保全と負担のバランスを取った構成です。</div>
+                </div>
+              </div>
+
+              <div class="nego-card">
+                <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:10px;">🔁 代替案（譲歩シナリオ）</div>
+                <div style="font-size:13px;line-height:1.8;color:var(--text-secondary);">
+                  ① 補助金活用＋金利スワップ（推奨）<br>
+                  ② 元金据置を6ヶ月→12ヶ月へ延長し、初年度の資金繰りを緩和<br>
+                  ③ 当初2年のみ金利-0.1%、以降は財務制限条項充足を条件に見直し
+                </div>
+              </div>
+
+              <div class="risk-card" style="margin-top:4px;">
+                <div style="font-size:12px;font-weight:700;color:#DC2626;margin-bottom:8px;">⚠ 注意事項（不適切表現の回避）</div>
+                <div style="font-size:12.5px;color:var(--text-secondary);line-height:1.7;">「必ず採択される」「絶対に損しない」等の<strong>断定・誤認を招く表現は使用しない</strong>こと。補助金は審査結果次第である旨を必ず付言してください。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: 与信リスクアラート (F-06 / F-07) ============ -->
+    <div class="tab-pane" id="tab-risk">
+      <div class="page-header">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="section-title">与信リスクアラート <span class="tag" style="vertical-align:middle;margin-left:8px;">F-06 / F-07</span></div>
+            <div class="section-sub">決算・取引データ・外部ニュースをAIが常時監視し、リスク兆候を自動検知</div>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <span class="source-badge" style="background:rgba(239,68,68,0.1);color:#DC2626;border-color:rgba(239,68,68,0.2);">🔴 重要 2</span>
+            <span class="source-badge" style="background:rgba(245,158,11,0.1);color:#D97706;border-color:rgba(245,158,11,0.2);">🟡 注意 3</span>
+            <span class="source-badge" style="background:rgba(16,185,129,0.1);color:#059669;border-color:rgba(16,185,129,0.2);">🟢 参考 5</span>
+          </div>
+        </div>
+      </div>
+      <div class="content-area">
+        <!-- 重要アラート -->
+        <div class="alert-row sev-high" style="cursor:pointer;" onclick="if(event.target.tagName!=='SELECT'&&event.target.tagName!=='OPTION')openModal('modal-alert')">
+          <div style="font-size:24px;">🔴</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:15px;font-weight:700;">三浦電子工業株式会社 <span class="priority-high" style="margin-left:8px;">重要</span> <span style="font-size:11px;color:var(--primary);font-weight:500;">詳細 →</span></div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">外部要因リスク ・ 検知 2026/06/15 09:12 ・ AL-2026-0612</div>
+              </div>
+              <select class="search-input" style="width:140px;padding:7px 10px;font-size:12px;"><option>未対応</option><option>面談予定</option><option>対応中</option><option>クローズ</option></select>
+            </div>
+            <div style="background:rgba(239,68,68,0.05);border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;line-height:1.7;">
+              <strong style="color:#DC2626;">検知理由：</strong> 主要販売先「○○工業」の民事再生手続き開始の報道を検知（ニュース配信基盤）。当社売上の約38%を占める取引先のため、<strong>売掛金回収遅延・連鎖的業況悪化のリスク</strong>。<br>
+              <strong style="color:var(--text-primary);">推奨対応：</strong> 即時面談・売掛金残高および回収予定の徴求・与信枠の一時見直し検討。
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+              <span class="source-badge">📰 ニュース配信基盤</span><span class="source-badge">勘定系：売掛金残高</span><span class="source-badge">取引集中度 38%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert-row sev-high">
+          <div style="font-size:24px;">🔴</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:15px;font-weight:700;">ベイサイド建設株式会社 <span class="priority-high" style="margin-left:8px;">重要</span></div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">財務リスク ・ 検知 2026/06/14 18:40 ・ AL-2026-0609</div>
+              </div>
+              <select class="search-input" style="width:140px;padding:7px 10px;font-size:12px;"><option>対応中</option><option>未対応</option><option>面談予定</option><option>クローズ</option></select>
+            </div>
+            <div style="background:rgba(239,68,68,0.05);border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;line-height:1.7;">
+              <strong style="color:#DC2626;">検知理由：</strong> 直近試算表で<strong>粗利率が前年同期比 -6.2pt 悪化</strong>、在庫が +1.8億円増加。事業計画（粗利率18%目標）に対し未達兆候。資材高騰の価格転嫁遅れと推定。<br>
+              <strong style="color:var(--text-primary);">推奨対応：</strong> 月次資料の追加徴求・採算改善計画のヒアリング。
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+              <span class="source-badge">📊 試算表（OCR）</span><span class="source-badge">粗利率 -6.2pt</span><span class="source-badge">在庫 +1.8億</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 注意アラート -->
+        <div class="alert-row sev-mid">
+          <div style="font-size:24px;">🟡</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:15px;font-weight:700;">神奈川精密工業株式会社 <span class="priority-mid" style="margin-left:8px;">注意</span></div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">財務リスク ・ 検知 2026/06/13 07:30 ・ AL-2026-0605</div>
+              </div>
+              <select class="search-input" style="width:140px;padding:7px 10px;font-size:12px;"><option>モニタリング</option><option>未対応</option><option>クローズ</option></select>
+            </div>
+            <div style="background:rgba(245,158,11,0.06);border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;line-height:1.7;">
+              <strong style="color:#D97706;">検知理由：</strong> 設備投資（8億円）申込に伴い、<strong>借入依存度が前期比 +8.4pt 上昇</strong>見込み。投資後2年間は減価償却負担が先行。現時点で返済原資は確保されるが要モニタリング。<br>
+              <strong style="color:var(--text-primary);">推奨対応：</strong> 投資実行後の四半期モニタリング設定・受注内示の確度確認。
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;">
+              <span class="source-badge">案件連携：2026-設-0288</span><span class="source-badge">借入依存度 +8.4pt</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert-row sev-mid">
+          <div style="font-size:24px;">🟡</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+              <div>
+                <div style="font-size:15px;font-weight:700;">湘南フードサービス株式会社 <span class="priority-mid" style="margin-left:8px;">注意</span></div>
+                <div style="font-size:12px;color:var(--text-secondary);margin-top:3px;">事業リスク ・ 検知 2026/06/12 ・ AL-2026-0601</div>
+              </div>
+              <select class="search-input" style="width:140px;padding:7px 10px;font-size:12px;"><option>未対応</option><option>面談予定</option><option>クローズ</option></select>
+            </div>
+            <div style="background:rgba(245,158,11,0.06);border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;line-height:1.7;">
+              <strong style="color:#D97706;">検知理由：</strong> 当座貸越の利用率が3ヶ月連続で90%超。売上の季節変動を超える資金繰りタイト化の兆候。
+            </div>
+          </div>
+        </div>
+
+        <div style="text-align:center;margin-top:8px;">
+          <button class="btn-secondary" onclick="toast('参考アラート5件を表示（デモ）')">参考アラート 5件を表示 ▾</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// 日付ラベル
+(function() {
+  const now = new Date();
+  const w = ['日','月','火','水','木','金','土'][now.getDay()];
+  const el = document.getElementById('dashboard-date');
+  if (el) el.innerHTML = `${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日（${w}）— 審査中14件 / 期日3日以内 <strong>4件</strong>`;
+})();
+
+// タブ切替
+function switchTab(tabName, navEl) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + tabName).classList.add('active');
+  if (navEl) navEl.classList.add('active');
+  else document.querySelectorAll('.nav-item').forEach(n => { const oc = n.getAttribute('onclick'); if (oc && oc.includes("'"+tabName+"'")) n.classList.add('active'); });
+  window.scrollTo(0, 0);
+}
+
+// トースト
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  document.getElementById('toast-text').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+// ワークスペース（稟議書作成エリア）を表示
+function revealRingiWorkspace() {
+  document.getElementById('ringi-workspace').style.display = 'block';
+}
+function resetRingiDraft() {
+  document.getElementById('ringi-content').style.display = 'none';
+  document.getElementById('ringi-progress').style.display = 'none';
+  document.getElementById('ringi-placeholder').style.display = 'block';
+  const btn = document.getElementById('ringi-btn');
+  if (btn) { btn.innerHTML = '✦ 稟議書ドラフトを生成'; btn.disabled = false; }
+}
+
+// ダッシュボードの案件カード → 既存案件として直接ワークスペースを開く
+function openCase() {
+  switchTab('ringi', document.querySelector('[onclick*=ringi]'));
+  document.getElementById('eys-result').style.display = 'block';
+  revealRingiWorkspace();
+}
+
+// EYS連携：CIF / 法人名から企業情報を取得
+function fetchEYS() {
+  const corp = document.getElementById('eys-corp').value.trim();
+  if (!corp) { toast('法人名またはCIF番号を入力してください'); return; }
+  const btn = document.getElementById('eys-btn');
+  btn.innerHTML = '<span class="spinner">⟳</span> 取得中...'; btn.disabled = true;
+  showLoading([[300,'EYS照会中...（CIF特定）',35],[900,'企業基本情報を取得中...',65],[1500,'格付・取引情報を取得中...',90],[1900,'完了',100]], 2200, () => {
+    document.getElementById('eys-result').style.display = 'block';
+    document.getElementById('eys-result').classList.add('fade-in-up');
+    btn.innerHTML = '🔍 EYSから取得'; btn.disabled = false;
+    toast('EYSから企業情報を取得しました');
+  });
+}
+
+// EYSの企業情報から類似案件検索へ
+function searchFromEYS() {
+  switchTab('search', document.querySelector('[onclick*=search]'));
+  const kw = document.getElementById('search-kw');
+  if (kw) kw.value = '精密機器 設備投資 新生産ライン 省力化';
+  runSearch();
+  toast('取得企業の事業内容で類似案件を検索します');
+}
+
+// EYS情報で稟議書作成（ワークスペースを開く）
+function startRingiFromEYS() {
+  revealRingiWorkspace();
+  resetRingiDraft();
+  setTimeout(() => document.getElementById('ringi-workspace').scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+  toast('取得情報をもとに稟議書作成を開始します');
+}
+
+// 類似案件を選択 → 稟議書ドラフト作成へ遷移
+function selectCaseToRingi(caseName) {
+  switchTab('ringi', document.querySelector('[onclick*=ringi]'));
+  document.getElementById('eys-result').style.display = 'block';
+  revealRingiWorkspace();
+  const base = document.getElementById('ringi-base');
+  if (base) { base.style.display = 'block'; document.getElementById('ringi-base-name').textContent = caseName; }
+  resetRingiDraft();
+  toast(caseName + ' をベース案件として稟議書作成へ');
+}
+
+// ===== 承認ワークフロー =====
+const approvalSteps = [
+  { role: '起案', name: '鈴木 健太', sub: '審査グループ' },
+  { role: '一次審査', name: '審査グループ長', sub: '佐藤 雅彦' },
+  { role: '融資課長', name: '高橋 信一', sub: '融資課' },
+  { role: '副部長', name: '渡辺 京子', sub: '融資部' },
+  { role: '最終決裁', name: '融資部長', sub: '伊藤 拓也' },
+];
+let approvalCurrent = 1;   // 0=起案済、1から承認待ち
+let approvalRouted = false;
+const approvalHistory = [];
+
+function renderRoute() {
+  const wrap = document.getElementById('approval-route');
+  wrap.innerHTML = '';
+  approvalSteps.forEach((st, i) => {
+    let color = '#CBD5E1', label = '未着手', text = '#94A3B8', pulse = '';
+    if (i < approvalCurrent) { color = 'var(--success)'; label = '完了'; text = 'var(--success)'; }
+    else if (i === approvalCurrent && approvalCurrent < approvalSteps.length) { color = 'var(--primary)'; label = '承認待ち'; text = 'var(--primary)'; pulse = 'pulse-ai'; }
+    if (approvalCurrent >= approvalSteps.length && i === approvalSteps.length - 1) { color = 'var(--success)'; label = '決裁済'; text = 'var(--success)'; }
+    const node = document.createElement('div');
+    node.style.cssText = 'flex:1;text-align:center;position:relative;';
+    node.innerHTML =
+      (i < approvalSteps.length - 1 ? `<div style="position:absolute;top:18px;left:60%;right:-40%;height:2px;background:${i < approvalCurrent ? 'var(--success)' : '#E2E8F0'};"></div>` : '') +
+      `<div class="${pulse}" style="width:38px;height:38px;border-radius:50%;background:${color};color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;margin:0 auto 8px;position:relative;z-index:1;">${i < approvalCurrent || (approvalCurrent >= approvalSteps.length && i === approvalSteps.length-1) ? '✓' : (i+1)}</div>` +
+      `<div style="font-size:11px;font-weight:700;color:var(--text-primary);">${st.role}</div>` +
+      `<div style="font-size:10.5px;color:var(--text-secondary);margin-top:1px;">${st.name}</div>` +
+      `<div style="font-size:10px;font-weight:700;color:${text};margin-top:3px;">${label}</div>`;
+    wrap.appendChild(node);
+  });
+}
+function renderHistory() {
+  const h = document.getElementById('approval-history');
+  if (!approvalHistory.length) { h.innerHTML = '<div style="color:var(--text-secondary);">まだ承認アクションはありません。</div>'; return; }
+  h.innerHTML = approvalHistory.map(it =>
+    `<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #F1F5F9;"><span style="color:${it.color};margin-top:2px;">●</span><div><div style="font-weight:600;">${it.title}</div><div style="font-size:11px;color:var(--text-secondary);">${it.meta}</div>${it.comment ? `<div style="font-size:11px;color:var(--text-primary);margin-top:2px;">「${it.comment}」</div>` : ''}</div></div>`
+  ).join('');
+}
+function updateApprovalBadge() {
+  const b = document.getElementById('approval-state-badge');
+  const action = document.getElementById('approval-action');
+  if (approvalCurrent >= approvalSteps.length) {
+    b.style.color = 'var(--success)'; b.textContent = '● 決裁完了';
+    action.innerHTML = '<div style="text-align:center;padding:18px;"><div style="font-size:32px;">✅</div><div style="font-size:14px;font-weight:700;margin-top:8px;color:var(--success);">決裁が完了しました</div><div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">全ての承認者による決裁が完了しました。</div></div>';
+  } else {
+    b.style.color = '#D97706'; b.textContent = '● ' + approvalSteps[approvalCurrent].role + ' 承認待ち';
+    document.querySelector('#approval-action div span').textContent = '（' + approvalSteps[approvalCurrent].role + '）';
+  }
+}
+
+// 稟議書を承認へ回付
+function routeForApproval() {
+  approvalRouted = true; approvalCurrent = 1; approvalHistory.length = 0;
+  approvalHistory.push({ color: 'var(--success)', title: '起案・申請', meta: '鈴木 健太（審査グループ） ・ 2026/06/17', comment: '' });
+  switchTab('approval', document.querySelector('[onclick*=approval]'));
+  document.getElementById('approval-empty').style.display = 'none';
+  document.getElementById('approval-content').style.display = 'block';
+  renderRoute(); renderHistory(); updateApprovalBadge();
+  toast('稟議書を承認ルート（一次審査）へ回付しました');
+}
+function approveStep(kind) {
+  if (approvalCurrent >= approvalSteps.length) return;
+  const st = approvalSteps[approvalCurrent];
+  const comment = document.getElementById('approval-comment').value.trim();
+  approvalHistory.push({ color: kind === '条件付承認' ? 'var(--warning)' : 'var(--success)', title: st.role + '：' + kind, meta: st.name + ' ・ 2026/06/17', comment });
+  document.getElementById('approval-comment').value = '';
+  approvalCurrent++;
+  renderRoute(); renderHistory(); updateApprovalBadge();
+  toast(approvalCurrent >= approvalSteps.length ? '最終決裁が完了しました' : st.role + 'が承認。次の承認者へ回付しました');
+}
+function rejectStep() {
+  if (approvalCurrent >= approvalSteps.length) return;
+  const st = approvalSteps[approvalCurrent];
+  const comment = document.getElementById('approval-comment').value.trim();
+  approvalHistory.push({ color: 'var(--danger)', title: st.role + '：差戻し', meta: st.name + ' ・ 2026/06/17', comment: comment || '記載内容の追加確認のため起案者へ差戻し' });
+  document.getElementById('approval-comment').value = '';
+  approvalCurrent = 0;
+  renderRoute(); renderHistory();
+  document.getElementById('approval-state-badge').style.color = 'var(--danger)';
+  document.getElementById('approval-state-badge').textContent = '● 起案者へ差戻し';
+  toast('起案者へ差し戻しました');
+}
+
+// モーダル
+function openModal(id) { document.getElementById(id).classList.add('show'); document.body.style.overflow = 'hidden'; }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); document.body.style.overflow = ''; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.show').forEach(m => closeModal(m.id)); });
+
+// 汎用ローディングオーバーレイ
+function showLoading(steps, doneMs, cb) {
+  const overlay = document.getElementById('loading-overlay');
+  const loadingText = document.getElementById('loading-text');
+  const fill = document.getElementById('progress-fill');
+  fill.style.width = '0%';
+  overlay.classList.add('visible');
+  steps.forEach(([delay, msg, pct]) => setTimeout(() => { loadingText.textContent = msg; fill.style.width = pct + '%'; }, delay));
+  setTimeout(() => { overlay.classList.remove('visible'); if (cb) cb(); }, doneMs);
+}
+
+// F-01 類似案件検索
+function runSearch() {
+  const btn = document.getElementById('search-btn');
+  btn.innerHTML = '<span class="spinner">⟳</span> 検索中...'; btn.disabled = true;
+  document.getElementById('search-placeholder').style.display = 'none';
+  showLoading([[300,'過去稟議をベクトル検索中...',30],[900,'類似度スコアを算出中...',60],[1500,'重要文言を抽出中...',90],[2000,'完了',100]], 2300, () => {
+    document.getElementById('search-results').style.display = 'block';
+    document.getElementById('search-results').classList.add('fade-in-up');
+    btn.innerHTML = '⌕ AI類似案件検索'; btn.disabled = false;
+  });
+}
+
+// F-02 稟議書ドラフト生成（インラインプログレス）
+function generateRingi() {
+  const btn = document.getElementById('ringi-btn');
+  btn.innerHTML = '<span class="spinner">⟳</span> 生成中...'; btn.disabled = true;
+  document.getElementById('ringi-placeholder').style.display = 'none';
+  document.getElementById('ringi-content').style.display = 'none';
+  document.getElementById('ringi-progress').style.display = 'block';
+  const fill = document.getElementById('ringi-fill');
+  const status = document.getElementById('ringi-status');
+  const steps = [
+    [0,'類似案件を抽出中...（A社/B社）',15],
+    [700,'取込資料から数値を転記中...',40],
+    [1500,'過去稟議の構成を解析中...',62],
+    [2300,'案件概要を文章化・推論中...（GPT-4.1）',84],
+    [3100,'根拠付与・整合性チェック中...',96],
+    [3700,'稟議書ドラフト完成',100]
+  ];
+  steps.forEach(([d,m,p]) => setTimeout(() => { status.textContent = m; fill.style.width = p+'%'; }, d));
+  setTimeout(() => {
+    document.getElementById('ringi-progress').style.display = 'none';
+    const c = document.getElementById('ringi-content');
+    c.style.display = 'block'; c.classList.add('fade-in-up');
+    btn.innerHTML = '✦ 再生成'; btn.disabled = false;
+    toast('稟議書ドラフトを生成しました（参照元7件・要確認2箇所）');
+  }, 4100);
+}
+
+// F-04 事業性評価
+let gaugeDrawn = false, finDrawn = false;
+function generateEval() {
+  document.getElementById('eval-placeholder').style.display = 'none';
+  showLoading([[300,'取込資料を分析中...',30],[900,'競争環境を整理中...',55],[1500,'定量・定性観点を統合中...',80],[2000,'評価コメント生成',100]], 2300, () => {
+    const c = document.getElementById('eval-content');
+    c.style.display = 'block'; c.classList.add('fade-in-up');
+    setTimeout(() => { drawGauge(); drawFinChart(); animateEvalBars(); }, 100);
+  });
+}
+function animateEvalBars() {
+  document.querySelectorAll('.ev-bar').forEach(b => { b.style.width = '0%'; setTimeout(() => b.style.width = b.dataset.w + '%', 50); });
+}
+function drawGauge() {
+  if (gaugeDrawn) return; gaugeDrawn = true;
+  const ctx = document.getElementById('gaugeChart');
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: { datasets: [{ data: [78, 22], backgroundColor: ['#1E6FD9', '#E2E8F0'], borderWidth: 0, circumference: 270, rotation: 225 }] },
+    options: { cutout: '75%', plugins: { legend: { display: false }, tooltip: { enabled: false } }, animation: { animateRotate: true, duration: 1200 } }
+  });
+}
+function drawFinChart() {
+  if (finDrawn) return; finDrawn = true;
+  const ctx = document.getElementById('finChart');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['第36期','第37期','第38期','第39期(計画)'],
+      datasets: [
+        { type:'bar', label:'売上高（億円）', data:[34.2,38.1,41.5,49.8], backgroundColor:'rgba(30,111,217,0.85)', borderRadius:6, order:2 },
+        { type:'line', label:'営業利益（億円）', data:[1.44,1.94,2.61,3.45], borderColor:'#10B981', backgroundColor:'#10B981', tension:0.4, pointRadius:4, yAxisID:'y1', order:1 }
+      ]
+    },
+    options: { responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{size:11}, boxWidth:12 } } },
+      scales:{ x:{ grid:{display:false}, ticks:{font:{size:10}} }, y:{ grid:{color:'#F1F5F9'}, ticks:{font:{size:10}} }, y1:{ position:'right', grid:{display:false}, ticks:{font:{size:10}} } } }
+  });
+}
+
+// F-05 条件交渉支援
+function generateNego() {
+  const btn = document.getElementById('nego-btn');
+  btn.innerHTML = '<span class="spinner">⟳</span> 生成中...'; btn.disabled = true;
+  document.getElementById('nego-placeholder').style.display = 'none';
+  showLoading([[300,'交渉対象の条件を解析中...',35],[900,'過去交渉事例を参照中...',65],[1500,'顧客属性に合わせ文案調整中...',90],[1900,'完了',100]], 2200, () => {
+    const c = document.getElementById('nego-content');
+    c.style.display = 'block'; c.classList.add('fade-in-up');
+    btn.innerHTML = '⇄ 再生成'; btn.disabled = false;
+  });
+}
+</script>
+</body>
+</html>
